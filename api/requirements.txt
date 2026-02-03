@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+python-dotenv
+# The Free Media Engine
+edge-tts
+moviepy==1.0.3
+# The Free AI Connection
+google-generativeai
