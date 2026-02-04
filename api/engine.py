@@ -8,52 +8,59 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- CONFIGURATION ---
-MODEL_NAME = "gemini-2.0-flash"
+# We try these models in order. If one fails, we try the next.
+MODEL_CANDIDATES = [
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro"
+]
+
 VOICE = "en-US-ChristopherNeural"
 BACKGROUND_VIDEO = "background.mp4"
 
-# --- BACKUP SCRIPT (Used if AI fails) ---
+# --- BACKUP SCRIPT (Last Resort) ---
 BACKUP_SCRIPT = (
-    "Yo, listen up! The AI is taking a nap right now, but I got you. "
-    "Newton's First Law is basically the law of being lazy. "
-    "Objects don't wanna move unless you push them. No cap. "
-    "It's called Inertia. Stay safe out there."
+    "Yo, the AI is taking a nap, but here's the tea. "
+    "Newton's First Law is the law of laziness. "
+    "Objects don't move unless you push them. "
+    "It's called Inertia. Stay safe."
 )
 
 
 def get_viral_script(notes: str):
-    print(f"1. Asking Gemini ({MODEL_NAME}) to write a script...")
-
     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     prompt = f"""
-    You are a Gen Z TikTok creator. Rewrite the following study notes into a funny, 
-    fast-paced 'brainrot' style script (max 30 seconds). 
-    Use slang like 'bet', 'no cap', 'cooked'. 
-
-    NOTES:
-    {notes}
+    Rewrite these notes into a funny, fast-paced 'brainrot' script (max 30s). 
+    Use slang: 'bet', 'no cap', 'cooked'. 
+    NOTES: {notes}
     """
 
-    try:
-        response = client.models.generate_content(
-            model=MODEL_NAME,
-            contents=prompt
-        )
-        if response.text:
-            return response.text.replace("*", "").replace("#", "")
+    # --- MODEL HOPPER LOGIC ---
+    for model_name in MODEL_CANDIDATES:
+        print(f"1. Trying Brain: {model_name}...")
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt
+            )
+            if response.text:
+                clean_text = response.text.replace("*", "").replace("#", "")
+                print(f"   ✅ Success with {model_name}!")
+                return clean_text
+        except Exception as e:
+            print(f"   ❌ {model_name} failed: {e}")
+            time.sleep(1)  # Short pause before next try
 
-    except Exception as e:
-        print(f"   ⚠️ AI Error: {e}")
-        print("   ⚠️ Switching to BACKUP SCRIPT to save the demo!")
-        return BACKUP_SCRIPT
+    print("   ⚠️ All AI models failed. Switching to BACKUP.")
+    return BACKUP_SCRIPT
 
 
 async def generate_brainrot(notes: str, output_filename: str = "final_brainrot.mp4"):
-    # 1. Get Script (AI or Backup)
+    # 1. Get Script (Model Hopper)
     script = get_viral_script(notes)
-    print(f"   Script used: {script[:50]}...")
 
+    # 2. Generate Audio
     print(f"2. Generating Audio...")
     communicate = edge_tts.Communicate(script, VOICE)
     await communicate.save("temp_voice.mp3")
